@@ -319,9 +319,9 @@ func (queue *redisQueue) batchSize() int {
 	prefetchCount := len(queue.deliveryChan)
 	prefetchLimit := queue.prefetchLimit - prefetchCount
 	// TODO: ignore ready count here and just return prefetchLimit?
-	if readyCount := queue.ReadyCount(); readyCount < prefetchLimit {
-		return readyCount
-	}
+	//if readyCount := queue.ReadyCount(); readyCount < prefetchLimit {
+	//	return readyCount
+	//}
 	return prefetchLimit
 }
 
@@ -332,7 +332,7 @@ func (queue *redisQueue) consumeBatch(batchSize int) bool {
 	}
 
 	for i := 0; i < batchSize; i++ {
-		result := queue.redisClient.RPopLPush(queue.readyKey, queue.unackedKey)
+		result := queue.redisClient.BRPopLPush(queue.readyKey, queue.unackedKey, 10 * time.Second)
 		if redisErrIsNil(result) {
 			// debug(fmt.Sprintf("rmq queue consumed last batch %s %d", queue, i)) // COMMENTOUT
 			return false
