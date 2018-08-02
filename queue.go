@@ -304,9 +304,9 @@ func (queue *redisQueue) consume() {
 		batchSize := queue.batchSize()
 		wantMore := queue.consumeBatch(batchSize)
 
-		if !wantMore {
-			time.Sleep(queue.pollDuration)
-		}
+		//if !wantMore {
+		//	time.Sleep(queue.pollDuration)
+		//}
 
 		if queue.consumingStopped {
 			// log.Printf("rmq queue stopped consuming %s", queue)
@@ -332,7 +332,7 @@ func (queue *redisQueue) consumeBatch(batchSize int) bool {
 	}
 
 	for i := 0; i < batchSize; i++ {
-		result := queue.redisClient.BRPopLPush(queue.readyKey, queue.unackedKey, 4 * time.Second)
+		result := queue.redisClient.BRPopLPush(queue.readyKey, queue.unackedKey, queue.pollDuration)
 		if redisErrIsNil(result) {
 			// debug(fmt.Sprintf("rmq queue consumed last batch %s %d", queue, i)) // COMMENTOUT
 			return false
