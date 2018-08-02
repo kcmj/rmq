@@ -332,7 +332,7 @@ func (queue *redisQueue) consumeBatch(batchSize int) bool {
 	}
 
 	for i := 0; i < batchSize; i++ {
-		result := queue.redisClient.BRPopLPush(queue.readyKey, queue.unackedKey, 10 * time.Second)
+		result := queue.redisClient.BRPopLPush(queue.readyKey, queue.unackedKey, 4 * time.Second)
 		if redisErrIsNil(result) {
 			// debug(fmt.Sprintf("rmq queue consumed last batch %s %d", queue, i)) // COMMENTOUT
 			return false
