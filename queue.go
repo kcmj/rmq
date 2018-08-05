@@ -356,6 +356,7 @@ func (queue *redisQueue) consumerConsume(consumer Consumer) {
 			consumer.Consume(delivery)
 		case <-queue.stopConsumSignal:
 			return
+		}
 	}
 	//for delivery := range queue.deliveryChan {
 		// debug(fmt.Sprintf("consumer consume %s %s", delivery, consumer)) // COMMENTOUT
