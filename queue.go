@@ -301,7 +301,8 @@ func (queue *redisQueue) addConsumer(tag string) (string, bool) {
 		return "", false
 	}
 
-	name := fmt.Sprintf("%s-%s", tag, uniuri.NewLen(6))
+	//name := fmt.Sprintf("%s-%s", tag, uniuri.NewLen(6))
+	name := tag
 
 	tryCnt := 0
 	for {

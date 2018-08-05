@@ -45,8 +45,8 @@ func (queue *TestQueue) AddBatchConsumer(tag string, batchSize int, consumer Bat
 	return "", true
 }
 
-func (queue *TestQueue) AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string {
-	return ""
+func (queue *TestQueue) AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) (string, bool) {
+	return "", true
 }
 
 func (queue *TestQueue) ReturnRejected(count int) int {

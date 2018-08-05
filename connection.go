@@ -31,7 +31,8 @@ type redisConnection struct {
 
 // OpenConnectionWithRedisClient opens and returns a new connection
 func OpenConnectionWithRedisClient(tag string, redisClient *redis.Client) *redisConnection {
-	name := fmt.Sprintf("%s-%s", tag, uniuri.NewLen(6))
+	//name := fmt.Sprintf("%s-%s", tag, uniuri.NewLen(6))
+	name := tag
 
 	connection := &redisConnection{
 		Name:         name,
@@ -45,7 +46,7 @@ func OpenConnectionWithRedisClient(tag string, redisClient *redis.Client) *redis
 	}
 
 	// add to connection set after setting heartbeat to avoid race with cleaner
-	if !redisErrIsNil(redisClient.SAdd(connectionsKey, name)) {
+	if redisErrIsNil(redisClient.SAdd(connectionsKey, name)) {
 		log.Panicf("rmq OpenConnectionWithRedisClient SAdd connectionsKey failed %s", connection)
 	}
 
