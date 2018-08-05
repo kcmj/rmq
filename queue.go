@@ -227,7 +227,7 @@ func (queue *redisQueue) StartConsuming(prefetchLimit int, pollDuration time.Dur
 			if tryCnt < 3 {
 				time.Sleep(500 * time.Millisecond)
 			} else {
-				log.Errorf("rmq queue failed to start consuming %s", queue)
+				log.Printf("rmq queue failed to start consuming %s", queue)
 				return false
 			}
 		} else {
@@ -297,7 +297,7 @@ func (queue *redisQueue) RemoveConsumer(name string) bool {
 
 func (queue *redisQueue) addConsumer(tag string) (string, bool) {
 	if queue.deliveryChan == nil {
-		log.Errorf("rmq queue failed to add consumer, call StartConsuming first! %s", queue)
+		log.Printf("rmq queue failed to add consumer, call StartConsuming first! %s", queue)
 		return "", false
 	}
 
@@ -311,7 +311,7 @@ func (queue *redisQueue) addConsumer(tag string) (string, bool) {
 			if tryCnt < 3 {
 				time.Sleep(500 * time.Millisecond)
 			} else {
-				log.Errorf("rmq queue failed to add consumer %s %s", queue, tag)
+				log.Printf("rmq queue failed to add consumer %s %s", queue, tag)
 				return "", false
 			}
 		} else {
@@ -476,7 +476,7 @@ func redisErrIsNil(result redis.Cmder) bool {
 	case redis.Nil:
 		return true
 	default:
-		log.Errorf("rmq redis error is not nil %s", result.Err())
+		log.Printf("rmq redis error is not nil %s", result.Err())
 		return true
 	}
 }

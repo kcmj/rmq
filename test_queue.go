@@ -37,12 +37,12 @@ func (queue *TestQueue) StopConsuming() bool {
 	return true
 }
 
-func (queue *TestQueue) AddConsumer(tag string, consumer Consumer) string {
-	return ""
+func (queue *TestQueue) AddConsumer(tag string, consumer Consumer) (string, bool) {
+	return "", true
 }
 
-func (queue *TestQueue) AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) string {
-	return ""
+func (queue *TestQueue) AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) (string, bool) {
+	return "", true
 }
 
 func (queue *TestQueue) AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string {
