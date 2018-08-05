@@ -59,6 +59,7 @@ type redisQueue struct {
 	prefetchLimit    int           // max number of prefetched deliveries number of unacked can go up to prefetchLimit + numConsumers
 	pollDuration     time.Duration
 	consumingStopped bool
+	stopConsumSignal chan struct{}
 }
 
 func newQueue(name, connectionName, queuesKey string, redisClient *redis.Client) *redisQueue {
@@ -226,6 +227,7 @@ func (queue *redisQueue) StartConsuming(prefetchLimit int, pollDuration time.Dur
 	queue.prefetchLimit = prefetchLimit
 	queue.pollDuration = pollDuration
 	queue.deliveryChan = make(chan Delivery, prefetchLimit)
+	queue.stopConsumSignal = make(chan struct{})
 	// log.Printf("rmq queue started consuming %s %d %s", queue, prefetchLimit, pollDuration)
 	go queue.consume()
 	return true
@@ -237,6 +239,7 @@ func (queue *redisQueue) StopConsuming() bool {
 	}
 
 	queue.consumingStopped = true
+	close(queue.stopConsumSignal)
 	return true
 }
 
@@ -304,9 +307,9 @@ func (queue *redisQueue) consume() {
 		batchSize := queue.batchSize()
 		wantMore := queue.consumeBatch(batchSize)
 
-		//if !wantMore {
-		//	time.Sleep(queue.pollDuration)
-		//}
+		if !wantMore {
+			time.Sleep(queue.pollDuration)
+		}
 
 		if queue.consumingStopped {
 			// log.Printf("rmq queue stopped consuming %s", queue)
@@ -332,7 +335,7 @@ func (queue *redisQueue) consumeBatch(batchSize int) bool {
 	}
 
 	for i := 0; i < batchSize; i++ {
-		result := queue.redisClient.BRPopLPush(queue.readyKey, queue.unackedKey, queue.pollDuration)
+		result := queue.redisClient.RPopLPush(queue.readyKey, queue.unackedKey)
 		if redisErrIsNil(result) {
 			// debug(fmt.Sprintf("rmq queue consumed last batch %s %d", queue, i)) // COMMENTOUT
 			return false
@@ -347,10 +350,17 @@ func (queue *redisQueue) consumeBatch(batchSize int) bool {
 }
 
 func (queue *redisQueue) consumerConsume(consumer Consumer) {
-	for delivery := range queue.deliveryChan {
-		// debug(fmt.Sprintf("consumer consume %s %s", delivery, consumer)) // COMMENTOUT
-		consumer.Consume(delivery)
+	for {
+		select {
+		case delivery := <-queue.deliveryChan:
+			consumer.Consume(delivery)
+		case <-queue.stopConsumSignal:
+			return
 	}
+	//for delivery := range queue.deliveryChan {
+		// debug(fmt.Sprintf("consumer consume %s %s", delivery, consumer)) // COMMENTOUT
+	//	consumer.Consume(delivery)
+	//}
 }
 
 func (queue *redisQueue) consumerBatchConsume(batchSize int, timeout time.Duration, consumer BatchConsumer) {

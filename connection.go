@@ -58,8 +58,6 @@ func OpenConnection(tag, network, address string, db int) *redisConnection {
 		Network: network,
 		Addr:    address,
 		DB:      int64(db),
-		PoolTimeout: 4 * time.Second,
-		PoolSize: 300,
 	})
 	return OpenConnectionWithRedisClient(tag, redisClient)
 }
