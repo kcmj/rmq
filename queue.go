@@ -35,9 +35,9 @@ type Queue interface {
 	SetPushQueue(pushQueue Queue)
 	StartConsuming(prefetchLimit int, pollDuration time.Duration) bool
 	StopConsuming() bool
-	AddConsumer(tag string, consumer Consumer) string
-	AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) string
-	AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string
+	AddConsumer(tag string, consumer Consumer) (string, bool)
+	AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) (string, bool)
+	AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) (string, bool)
 	PurgeReady() int
 	PurgeRejected() int
 	ReturnRejected(count int) int
@@ -219,9 +219,20 @@ func (queue *redisQueue) StartConsuming(prefetchLimit int, pollDuration time.Dur
 		return false // already consuming
 	}
 
-	// add queue to list of queues consumed on this connection
-	if redisErrIsNil(queue.redisClient.SAdd(queue.queuesKey, queue.name)) {
-		log.Panicf("rmq queue failed to start consuming %s", queue)
+	tryCnt := 0
+	for {
+		tryCnt++
+		// add queue to list of queues consumed on this connection
+		if redisErrIsNil(queue.redisClient.SAdd(queue.queuesKey, queue.name)) {
+			if tryCnt < 3 {
+				time.Sleep(500 * time.Millisecond)
+			} else {
+				log.Errorf("rmq queue failed to start consuming %s", queue)
+				return false
+			}
+		} else {
+			break
+		}
 	}
 
 	queue.prefetchLimit = prefetchLimit
@@ -245,21 +256,27 @@ func (queue *redisQueue) StopConsuming() bool {
 
 // AddConsumer adds a consumer to the queue and returns its internal name
 // panics if StartConsuming wasn't called before!
-func (queue *redisQueue) AddConsumer(tag string, consumer Consumer) string {
-	name := queue.addConsumer(tag)
+func (queue *redisQueue) AddConsumer(tag string, consumer Consumer) (string, bool) {
+	name, ok := queue.addConsumer(tag)
+	if !ok {
+		return "", false
+	}
 	go queue.consumerConsume(consumer)
-	return name
+	return name, true
 }
 
 // AddBatchConsumer is similar to AddConsumer, but for batches of deliveries
-func (queue *redisQueue) AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) string {
+func (queue *redisQueue) AddBatchConsumer(tag string, batchSize int, consumer BatchConsumer) (string, bool) {
 	return queue.AddBatchConsumerWithTimeout(tag, batchSize, defaultBatchTimeout, consumer)
 }
 
-func (queue *redisQueue) AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) string {
-	name := queue.addConsumer(tag)
+func (queue *redisQueue) AddBatchConsumerWithTimeout(tag string, batchSize int, timeout time.Duration, consumer BatchConsumer) (string, bool) {
+	name, ok := queue.addConsumer(tag)
+	if !ok {
+		return "", false
+	}
 	go queue.consumerBatchConsume(batchSize, timeout, consumer)
-	return name
+	return name, true
 }
 
 func (queue *redisQueue) GetConsumers() []string {
@@ -278,20 +295,32 @@ func (queue *redisQueue) RemoveConsumer(name string) bool {
 	return result.Val() > 0
 }
 
-func (queue *redisQueue) addConsumer(tag string) string {
+func (queue *redisQueue) addConsumer(tag string) (string, bool) {
 	if queue.deliveryChan == nil {
-		log.Panicf("rmq queue failed to add consumer, call StartConsuming first! %s", queue)
+		log.Errorf("rmq queue failed to add consumer, call StartConsuming first! %s", queue)
+		return "", false
 	}
 
 	name := fmt.Sprintf("%s-%s", tag, uniuri.NewLen(6))
 
-	// add consumer to list of consumers of this queue
-	if redisErrIsNil(queue.redisClient.SAdd(queue.consumersKey, name)) {
-		log.Panicf("rmq queue failed to add consumer %s %s", queue, tag)
+	tryCnt := 0
+	for {
+		tryCnt++
+		// add consumer to list of consumers of this queue
+		if redisErrIsNil(queue.redisClient.SAdd(queue.consumersKey, name)) {
+			if tryCnt < 3 {
+				time.Sleep(500 * time.Millisecond)
+			} else {
+				log.Errorf("rmq queue failed to add consumer %s %s", queue, tag)
+				return "", false
+			}
+		} else {
+			break
+		}
 	}
 
 	// log.Printf("rmq queue added consumer %s %s", queue, name)
-	return name
+	return name, true
 }
 
 func (queue *redisQueue) RemoveAllConsumers() int {
@@ -447,8 +476,8 @@ func redisErrIsNil(result redis.Cmder) bool {
 	case redis.Nil:
 		return true
 	default:
-		log.Panicf("rmq redis error is not nil %s", result.Err())
-		return false
+		log.Errorf("rmq redis error is not nil %s", result.Err())
+		return true
 	}
 }
 

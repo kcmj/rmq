@@ -45,7 +45,9 @@ func OpenConnectionWithRedisClient(tag string, redisClient *redis.Client) *redis
 	}
 
 	// add to connection set after setting heartbeat to avoid race with cleaner
-	redisErrIsNil(redisClient.SAdd(connectionsKey, name))
+	if !redisErrIsNil(redisClient.SAdd(connectionsKey, name)) {
+		log.Panicf("rmq OpenConnectionWithRedisClient SAdd connectionsKey failed %s", connection)
+	}
 
 	go connection.heartbeat()
 	// log.Printf("rmq connection connected to %s %s:%s %d", name, network, address, db)
@@ -58,13 +60,28 @@ func OpenConnection(tag, network, address string, db int) *redisConnection {
 		Network: network,
 		Addr:    address,
 		DB:      int64(db),
+		PoolSize: 50,
+		PoolTimeout: 5 * time.Second,
 	})
 	return OpenConnectionWithRedisClient(tag, redisClient)
 }
 
 // OpenQueue opens and returns the queue with a given name
 func (connection *redisConnection) OpenQueue(name string) Queue {
-	redisErrIsNil(connection.redisClient.SAdd(queuesKey, name))
+	tryCnt := 0
+	for {
+		tryCnt++
+		ok := !redisErrIsNil(connection.redisClient.SAdd(queuesKey, name))
+		if !ok {
+			if tryCnt < 3 {
+				time.Sleep(500 * time.Millisecond)	
+			} else {
+				return nil
+			}
+		} else {
+			break
+		}
+	}
 	queue := newQueue(name, connection.Name, connection.queuesKey, connection.redisClient)
 	return queue
 }
